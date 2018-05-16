@@ -1,50 +1,38 @@
 import logging
+import re
 
 import requests
-from requests.exceptions import HTTPError
+
+from .services import BaseService
 
 log = logging.getLogger()
 
 
+def to_snake(name):
+    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+
 class TrendServiceREST:
 
-    def __init__(self, base_url, username='', password='', login=True):
+    def __init__(self, base_url, username=None, password=None):
         self.rest_url = f"{base_url}/rest"
         self.username = username
         self.password = password
         self.session = requests.Session()
+        self._register_services()
 
-        if login:
-            self._login()
+        if username is not None and password is not None:
+            self.authentication.login(self.username, self.password)
 
-    def _login(self):
-        payload = {
-            "dsCredentials": {
-                "userName": self.username,
-                "password": self.password,
-            }
-        }
-        try:
-            response = self.session.post(
-                f"{self.rest_url}/authentication/login", json=payload
-            )
-            response.raise_for_status()
+    def _register_services(self):
+        for cls in BaseService.__subclasses__():
+            name = to_snake(cls.__name__.replace("Service", ""))
+            service = cls(self.session, self.rest_url)
+            setattr(self, name, service)
 
-            self.session.params.update({"sID": response.text})
-        except HTTPError as e:
-            log.exception("Login failed")
-
-    def logout(self):
-        try:
-            response = self.session.delete(
-                f"{self.rest_url}/authentication/logout"
-            )
-            response.raise_for_status()
-
-            if response.text == 'OK':
-                self.session.params.pop("sID", None)
-        except HTTPError as e:
-            log.exception("Logout failed")
+    # def __getattr__(self, name):
+    #     return getattr(self.__authentication, name)
 
     def version(self):
         response = self.session.get(f"{self.rest_url}/apiVersion")
