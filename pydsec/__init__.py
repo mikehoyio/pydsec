@@ -1,6 +1,5 @@
 import logging
 
-from .pydsec import TrendServiceREST
-
+from .pydsec import Trend
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())

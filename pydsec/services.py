@@ -1,5 +1,6 @@
 import logging
 import xml.etree.ElementTree as ET
+from urllib.parse import quote
 
 from requests.exceptions import HTTPError
 
@@ -20,11 +21,11 @@ class BaseService:
 class AuthenticationService(BaseService):
     service_path = "authentication"
 
-    def login(self, username, password, primary=False, sso=False):
+    def login(self, username, password, primary, sso):
         if primary and sso:
             raise ValueError("Do not supply both arguments")
 
-        url = f"{self.url}/login",
+        url = f"{self.url}/login"
         if primary:
             url = f"{url}/primary"
 
@@ -35,9 +36,18 @@ class AuthenticationService(BaseService):
         try:
             response = self.session.post(url, json=payload)
             response.raise_for_status()
+            return response.text
 
-            self.session_id = response.text
-            self.session.params.update({"sID": self.session_id})
+        except HTTPError as e:
+            log.exception("Login failed")
+
+    def tenant_login(self, tenant_name):
+        try:
+            tenant_name = quote(tenant_name, safe="")
+            response = self.session.get(f"{self.url}/signinastenant/name/{tenant_name}")
+            response.raise_for_status()
+            return response.text
+
         except HTTPError as e:
             log.exception("Login failed")
 
@@ -46,8 +56,6 @@ class AuthenticationService(BaseService):
             response = self.session.delete(f"{self.url}/logout")
             response.raise_for_status()
 
-            if response.text == "OK":
-                self.session.params.pop("sID", None)
         except HTTPError as e:
             log.exception("Logout failed")
 
