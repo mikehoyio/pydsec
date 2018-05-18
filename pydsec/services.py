@@ -2,7 +2,9 @@ import logging
 import xml.etree.ElementTree as ET
 from urllib.parse import quote
 
-from requests.exceptions import HTTPError
+from requests.exceptions import ConnectionError, HTTPError, Timeout
+
+from .exceptions import InternalServerError, Unavailable
 
 log = logging.getLogger()
 
@@ -17,57 +19,68 @@ class BaseService:
     def url(self):
         return f"{self.base_url}/{self.service_path}"
 
+    def make_request(self, method, url, *args, **kwargs):
+        try:
+            func = getattr(self.session, method)
+            endpoint = f"{self.url}/{url}"
+            log.info(f"Calling: {endpoint}")
+            response = func(endpoint, *args, **kwargs)
+        except (ConnectionError, Timeout) as e:
+            log.exception("Connection Error")
+            raise Unavailable() from e
+
+        response.raise_for_status()
+
+        return response
+
 
 class AuthenticationService(BaseService):
     service_path = "authentication"
 
-    def login(self, username, password, primary, sso):
-        if primary and sso:
-            raise ValueError("Do not supply both arguments")
-
-        url = f"{self.url}/login"
-        if primary:
-            url = f"{url}/primary"
-
-        if sso:
-            url = f"{url}/sso"
-
-        payload = {"dsCredentials": {"userName": username, "password": password}}
+    def login(self, username, password):
         try:
-            response = self.session.post(url, json=payload)
-            response.raise_for_status()
-            return response.text
-
+            response = self.make_request(
+                "post",
+                "login",
+                json={"dsCredentials": {"userName": username, "password": password}},
+            )
         except HTTPError as e:
             log.exception("Login failed")
+            raise InternalServerError() from e
+
+        return response.text
 
     def tenant_login(self, tenant_name):
         try:
             tenant_name = quote(tenant_name, safe="")
-            response = self.session.get(f"{self.url}/signinastenant/name/{tenant_name}")
-            response.raise_for_status()
-            return response.text
-
+            response = self.make_request("get", f"signinastenant/name/{tenant_name}")
         except HTTPError as e:
-            log.exception("Login failed")
+            log.exception("Tenant Login failed")
+            raise InternalServerError() from e
+
+        return response.text
 
     def logout(self):
         try:
-            response = self.session.delete(f"{self.url}/logout")
-            response.raise_for_status()
-
+            response = self.make_request("delete", "logout")
         except HTTPError as e:
             log.exception("Logout failed")
+            raise InternalServerError() from e
+
+        return response.text == "OK"
 
 
 class CloudAccountsService(BaseService):
     service_path = "cloudaccounts"
 
-    def list_cloud_accounts(self, cloud_account=None):
-        url = self.url
-        if cloud_account:
-            url = f"{url}/{cloud_account}"
-        response = self.session.get(url, headers={"Accept": "application/json"})
+    def cloud_accounts(self, cloud_account=""):
+        try:
+            response = self.make_request(
+                "get", cloud_account, headers={"Accept": "application/json"}
+            )
+        except HTTPError as e:
+            log.exception("Cloud accounts failed")
+            raise InternalServerError() from e
 
         return response.json()
 
@@ -75,7 +88,7 @@ class CloudAccountsService(BaseService):
 class TenantsService(BaseService):
     service_path = "tenants"
 
-    def get(self, id=None, name=None):
+    def tenants(self, id=None, name=None):
         if name and id:
             raise ValueError("Do not supply both arguments")
 
@@ -85,7 +98,12 @@ class TenantsService(BaseService):
 
         if name:
             url = f"{url}/name/{name}"
-        response = self.session.get(url)
+
+        try:
+            response = self.make_request("get", url)
+        except HTTPError as e:
+            log.exception("Tenants failed")
+            raise InternalServerError() from e
 
         # Having to do this because trend will not return json
         tree = ET.fromstring(response.text)

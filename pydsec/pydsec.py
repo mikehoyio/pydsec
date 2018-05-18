@@ -4,9 +4,10 @@ from contextlib import contextmanager
 
 import requests
 
-from zeep import Client
-
 from .services import BaseService
+
+# from zeep import Client
+
 
 log = logging.getLogger()
 
@@ -43,10 +44,8 @@ class Trend:
     #     import pdb;pdb.set_trace()
     #     return getattr(self.__soap.service, name)
 
-    def login(self, primary=False, sso=False):
-        session_id = self.authentication.login(
-            self.username, self.password, primary, sso
-        )
+    def login(self):
+        session_id = self.authentication.login(self.username, self.password)
         self.session.params.update({"sID": session_id})
 
     def logout(self):
