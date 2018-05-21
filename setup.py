@@ -12,7 +12,7 @@ from shutil import rmtree
 from setuptools import Command, find_packages, setup
 
 # Package meta-data.
-NAME = "pydesc"
+NAME = "pydsec"
 DESCRIPTION = "Python REST and SOAP client for Trend Micro Deep Security"
 URL = "https://github.com/mikehoyio/pydsec"
 EMAIL = "mikehoy@gmail.com"

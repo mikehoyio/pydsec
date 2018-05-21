@@ -62,21 +62,22 @@ class AuthenticationService(BaseService):
 
     def logout(self):
         try:
-            response = self.make_request("delete", "logout")
+            self.make_request("delete", "logout")
         except HTTPError as e:
             log.exception("Logout failed")
             raise InternalServerError() from e
-
-        return response.text == "OK"
 
 
 class CloudAccountsService(BaseService):
     service_path = "cloudaccounts"
 
-    def cloud_accounts(self, cloud_account=""):
+    def cloud_accounts_by_name(self, name):
+        return self.cloud_accounts(name)
+
+    def cloud_accounts(self, url=""):
         try:
             response = self.make_request(
-                "get", cloud_account, headers={"Accept": "application/json"}
+                "get", url, headers={"Accept": "application/json"}
             )
         except HTTPError as e:
             log.exception("Cloud accounts failed")
@@ -88,17 +89,13 @@ class CloudAccountsService(BaseService):
 class TenantsService(BaseService):
     service_path = "tenants"
 
-    def tenants(self, id=None, name=None):
-        if name and id:
-            raise ValueError("Do not supply both arguments")
+    def tenants_by_name(self, name):
+        return self.tenants(f"name/{name}")
 
-        url = self.url
-        if id:
-            url = f"{url}/id/{id}"
+    def tenants_by_id(self, id):
+        return self.tenants(f"id/{id}")
 
-        if name:
-            url = f"{url}/name/{name}"
-
+    def tenants(self, url=""):
         try:
             response = self.make_request("get", url)
         except HTTPError as e:
