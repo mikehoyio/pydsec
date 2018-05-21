@@ -21,7 +21,6 @@ class Trend:
 
     def __init__(self, base_url, username=None, password=None):
         self.base_url = base_url
-        self.rest_url = f"{base_url}/rest"
         self.username = username
         self.password = password
         self.session = requests.Session()
@@ -33,7 +32,7 @@ class Trend:
     def _register_rest_services(self):
         for cls in BaseService.__subclasses__():
             name = to_snake(cls.__name__.replace("Service", ""))
-            service = cls(self.session, self.rest_url)
+            service = cls(self.session, self.base_url)
             setattr(self, name, service)
 
     @property
@@ -72,7 +71,7 @@ class Trend:
         self._sid = root_session_id
 
     def api_version(self):
-        response = self.session.get(f"{self.rest_url}/apiVersion")
+        response = self.session.get(f"{self.base_url}/rest/apiVersion")
         return {"version": response.text}
 
 

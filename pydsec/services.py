@@ -14,10 +14,7 @@ class BaseService:
     def __init__(self, session, base_url):
         self.session = session
         self.base_url = base_url
-
-    @property
-    def url(self):
-        return f"{self.base_url}/{self.service_path}"
+        self.url = f"{self.base_url}/rest/{self.service_path}"
 
     def make_request(self, method, url, *args, **kwargs):
         try:
